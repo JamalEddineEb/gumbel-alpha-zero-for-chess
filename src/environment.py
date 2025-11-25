@@ -2,8 +2,6 @@ import chess
 import numpy as np
 import random
 
-from src.chess_renderer import ChessRenderer
-
 class ChessEnv:
     def __init__(self, demo_mode=False):
         self.board = chess.Board()
