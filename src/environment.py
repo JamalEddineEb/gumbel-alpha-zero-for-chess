@@ -10,10 +10,7 @@ class ChessEnv:
         self.mates = 0
         self.steps = 0
         self.demo_mode = demo_mode
-        if self.demo_mode:
-            self.renderer = ChessRenderer(self.board)
-        else:
-            self.renderer = None
+        self.renderer = None
         self.reset()
 
     def reset(self, random_moves=0, fen=None, difficulty=None):
@@ -53,7 +50,7 @@ class ChessEnv:
         return self.get_state()
 
     def _generate_easy_position(self):
-        self.board.set_fen("5K1k/8/8/8/8/3Q4/8/8 w HAha - 0 1")
+        self.board.set_fen("5K1k/8/8/8/8/3Q4/8/8 w - - 0 1")
 
     def _generate_medium_position(self):
         self.board.set_fen("7k/8/5K2/8/8/3Q4/8/8 w - - 0 1")
@@ -125,7 +122,6 @@ class ChessEnv:
         if self.board.is_checkmate():
             reward = 1.0
             self.mates += 1
-            print("Mate!")
             self.done = True
 
         elif self.board.is_stalemate() or self.board.is_game_over() or self.board.is_insufficient_material():

@@ -13,7 +13,7 @@ def train_agent(start_fen=None):
     # Training parameters
     n_episodes = 1000
     n_simulations = 500
-    batch_size = 200
+    batch_size = 150
 
     # Initialize environment and agent
     env = ChessEnv(demo_mode=False)
@@ -23,7 +23,7 @@ def train_agent(start_fen=None):
     
     episodes = n_episodes
     target_update_frequency = 2
-    checkpoint_frequency = 5
+    checkpoint_frequency = 2
 
     import tensorflow as tf
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))

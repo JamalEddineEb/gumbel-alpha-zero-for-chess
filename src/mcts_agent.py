@@ -361,7 +361,6 @@ class MCTSAgent():
         # Sample a minibatch
         import random
         minibatch = random.sample(self.memory, batch_size)
-        minibatch = self.memory
 
         states = np.array([x[0] for x in minibatch], dtype=np.float32)
         targets_pi = np.array([x[1] for x in minibatch], dtype=np.float32)
@@ -370,7 +369,7 @@ class MCTSAgent():
         self.model.fit(
             states,
             [targets_pi, targets_v],
-            epochs=30,
+            epochs=5,
             verbose=1,
         )
 
