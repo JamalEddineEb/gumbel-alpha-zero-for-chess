@@ -23,7 +23,6 @@ def train_agent(start_fen=None):
     
     episodes = n_episodes
     target_update_frequency = 2
-    checkpoint_frequency = 2
 
     import tensorflow as tf
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
@@ -110,7 +109,7 @@ def train_agent(start_fen=None):
         if len(recent_results) >= 50:
             win_rate = sum(recent_results) / len(recent_results)
             print(f"Recent Win Rate: {win_rate:.2f}")
-            if win_rate > 0.75 and difficulty < 2:
+            if win_rate > 0.8 and difficulty < 2:
                 difficulty += 1
                 recent_results.clear() # Reset stats for new difficulty
                 print(f"*** INCREASING DIFFICULTY TO {difficulty} ***")
@@ -123,7 +122,7 @@ def train_agent(start_fen=None):
         )
 
         # --- TRAINING STEP -----------------------------------------
-        if len(agent.memory) >= batch_size and e%checkpoint_frequency==0:
+        if len(agent.memory) >= batch_size:
             agent.replay(batch_size)
             agent.save(model_file)
 

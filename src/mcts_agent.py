@@ -7,12 +7,12 @@ import math
 from src.mcts_node import MCTSNode
 from src.utils.utilities import *
 from src.utils.move_mapping import MoveMapping
-
+from tensorflow.keras.optimizers import Adam
 
 class MCTSAgent():
     def __init__(self, state_size, n_simulations=100):
         self.state_size = state_size
-        self.memory = deque(maxlen=10000)
+        self.memory = deque(maxlen=50000)
         self.n_simulations = n_simulations
         self.move_mapping = MoveMapping()
         self.gamma = 0.95
@@ -56,7 +56,9 @@ class MCTSAgent():
 
         # Create the model
         model = models.Model(inputs=input_layer, outputs=[policy_output, value_output])
-        model.compile(optimizer='adam', loss=['categorical_crossentropy', 'mean_squared_error'], metrics=['accuracy','accuracy'])
+
+        opt = Adam(learning_rate=self.learning_rate)
+        model.compile(optimizer=opt, loss=['categorical_crossentropy', 'mean_squared_error'], metrics=['accuracy','accuracy'])
 
         return model
 
@@ -369,7 +371,7 @@ class MCTSAgent():
         self.model.fit(
             states,
             [targets_pi, targets_v],
-            epochs=5,
+            epochs=1,
             verbose=1,
         )
 
