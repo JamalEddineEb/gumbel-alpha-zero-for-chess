@@ -371,7 +371,7 @@ class MCTSAgent():
         self.model.fit(
             states,
             [targets_pi, targets_v],
-            epochs=1,
+            epochs=5, 
             verbose=1,
         )
 

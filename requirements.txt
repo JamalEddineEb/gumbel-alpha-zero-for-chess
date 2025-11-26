@@ -1,6 +1,5 @@
 chess
 keras
 numpy
-PyQt5
 pyqt5_sip
 tensorflow
