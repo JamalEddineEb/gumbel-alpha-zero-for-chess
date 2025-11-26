@@ -116,7 +116,7 @@ def transform_policy(policy, transform_id, move_mapping):
     Apply symmetry transformation to policy vector.
     
     Args:
-        policy: (4096,) numpy array of move probabilities
+        policy: (4096+,) numpy array of move probabilities
         transform_id: 0-7 representing different symmetries
         move_mapping: MoveMapping instance
         
@@ -129,32 +129,47 @@ def transform_policy(policy, transform_id, move_mapping):
     transformed_policy = np.zeros_like(policy)
     square_transform = get_square_transform(transform_id)
     
-    # For each move in the original policy
-    for move_idx in range(len(policy)):
-        if policy[move_idx] > 0:
-            # Get the UCI move string
-            uci = move_mapping.get_move_uci(move_idx)
-            if uci is None:
+    # For base moves (first 4096 indices): from_sq * 64 + to_sq
+    for from_sq in range(64):
+        for to_sq in range(64):
+            idx = from_sq * 64 + to_sq
+            if policy[idx] > 0:
+                # Transform squares
+                new_from = square_transform(from_sq)
+                new_to = square_transform(to_sq)
+                new_idx = new_from * 64 + new_to
+                transformed_policy[new_idx] = policy[idx]
+    
+    # For promotion moves (indices >= 4096)
+    # These are more complex, so we'll handle them via UCI
+    for idx in range(4096, len(policy)):
+        if policy[idx] > 0:
+            try:
+                uci = move_mapping.get_move_uci(idx)
+                if uci is None:
+                    continue
+                
+                # Parse move
+                from_sq = chess.SQUARE_NAMES.index(uci[:2])
+                to_sq = chess.SQUARE_NAMES.index(uci[2:4])
+                
+                # Transform squares
+                new_from = square_transform(from_sq)
+                new_to = square_transform(to_sq)
+                
+                # Handle promotion
+                promotion = uci[4:] if len(uci) > 4 else ''
+                
+                # Create new UCI
+                new_uci = chess.SQUARE_NAMES[new_from] + chess.SQUARE_NAMES[new_to] + promotion
+                
+                # Get new index
+                new_idx = move_mapping.get_index(new_uci)
+                if new_idx is not None:
+                    transformed_policy[new_idx] = policy[idx]
+            except (KeyError, IndexError, ValueError):
+                # Skip invalid moves
                 continue
-            
-            # Parse move
-            from_sq = chess.SQUARE_NAMES.index(uci[:2])
-            to_sq = chess.SQUARE_NAMES.index(uci[2:4])
-            
-            # Transform squares
-            new_from = square_transform(from_sq)
-            new_to = square_transform(to_sq)
-            
-            # Handle promotion
-            promotion = uci[4:] if len(uci) > 4 else ''
-            
-            # Create new UCI
-            new_uci = chess.SQUARE_NAMES[new_from] + chess.SQUARE_NAMES[new_to] + promotion
-            
-            # Get new index
-            new_idx = move_mapping.get_index(new_uci)
-            if new_idx is not None:
-                transformed_policy[new_idx] = policy[move_idx]
     
     # Renormalize
     total = transformed_policy.sum()
