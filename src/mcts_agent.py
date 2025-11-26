@@ -19,7 +19,7 @@ class MCTSAgent():
         self.epsilon = 1
         self.epsilon_decay = 0.9998
         self.epsilon_min = 0.1
-        self.learning_rate = 0.001
+        self.learning_rate = 0.01
         self.c_scale = 1
         self.c_visit = 50
         self.model = self._build_model()

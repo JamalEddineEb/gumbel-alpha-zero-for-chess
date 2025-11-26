@@ -20,5 +20,10 @@ WORKDIR /home/app/chess-endgame-mcts
 COPY requirements.txt ./
 RUN if [ -s requirements.txt ]; then pip install --no-cache-dir -r requirements.txt; else echo "# empty" > requirements.txt; fi
 
+# Copy source code
+COPY src/ ./src/
+
+# Copy model checkpoint if it exists (allows container to use pre-trained model)
+COPY model_checkpoint.weights.h5 ./model_checkpoint.weights.h5
 
 CMD ["python", "-m", "src.train"]

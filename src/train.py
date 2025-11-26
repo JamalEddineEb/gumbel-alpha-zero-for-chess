@@ -11,7 +11,7 @@ import argparse
 
 def train_agent(start_fen=None):
     # Training parameters
-    n_episodes = 1000
+    n_episodes = 10000
     n_simulations = 500
     batch_size = 150
 
@@ -126,7 +126,6 @@ def train_agent(start_fen=None):
             agent.replay(batch_size)
             agent.save(model_file)
 
-        # Update target network periodically (optional)
         if e % target_update_frequency == 0:
             agent.update_target_model()
 
