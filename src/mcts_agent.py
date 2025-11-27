@@ -1,6 +1,8 @@
 import chess
 import numpy as np
 import json
+import random 
+
 from collections import deque
 from keras import layers, models
 import math
