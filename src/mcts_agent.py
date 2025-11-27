@@ -15,11 +15,7 @@ class MCTSAgent():
         self.memory = deque(maxlen=50000)
         self.n_simulations = n_simulations
         self.move_mapping = MoveMapping()
-        self.gamma = 0.95
-        self.epsilon = 1
-        self.epsilon_decay = 0.9998
-        self.epsilon_min = 0.1
-        self.learning_rate = 0.001
+        self.learning_rate = 0.0005
         self.c_scale = 1
         self.c_visit = 50
         self.model = self._build_model()
@@ -361,19 +357,21 @@ class MCTSAgent():
         print("Replaying...")
 
         # Sample a minibatch
-        import random
-        minibatch = random.sample(self.memory, batch_size)
+        # Train on multiple batches to see more data without overfitting one batch
+        training_steps = 4
+        for _ in range(training_steps):
+            minibatch = random.sample(self.memory, batch_size)
 
-        states = np.array([x[0] for x in minibatch], dtype=np.float32)
-        targets_pi = np.array([x[1] for x in minibatch], dtype=np.float32)
-        targets_v = np.array([x[2] for x in minibatch], dtype=np.float32)
+            states = np.array([x[0] for x in minibatch], dtype=np.float32)
+            targets_pi = np.array([x[1] for x in minibatch], dtype=np.float32)
+            targets_v = np.array([x[2] for x in minibatch], dtype=np.float32)
 
-        self.model.fit(
-            states,
-            [targets_pi, targets_v],
-            epochs=5, 
-            verbose=1,
-        )
+            self.model.fit(
+                states,
+                [targets_pi, targets_v],
+                epochs=1, 
+                verbose=0,
+            )
 
     def load(self, name):
         self.model.load_weights(name)
