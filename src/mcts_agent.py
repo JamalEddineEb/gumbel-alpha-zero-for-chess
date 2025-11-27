@@ -372,7 +372,6 @@ class MCTSAgent():
                 states,
                 [targets_pi, targets_v],
                 epochs=1, 
-                verbose=0,
             )
 
     def load(self, name):
