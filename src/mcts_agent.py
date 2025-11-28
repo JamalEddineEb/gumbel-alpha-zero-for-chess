@@ -375,7 +375,6 @@ class MCTSAgent():
             batch_size=batch_size,
             epochs=epochs,
             shuffle=True,
-            verbose=0
         )
 
     def load(self, name):
