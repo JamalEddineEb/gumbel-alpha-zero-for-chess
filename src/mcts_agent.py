@@ -25,59 +25,59 @@ class MCTSAgent():
         self.update_target_model()
 
     def _build_model(self):
-        # Input layer for an 8x8 chessboard with 12 channels
+        # Standard AlphaZero weight decay
+        reg = regularizers.l2(1e-4)
+
         input_layer = layers.Input(shape=(8, 8, 12))
 
-        # Initial Convolution
-        x = layers.Conv2D(filters=64, kernel_size=(3, 3), padding='same')(input_layer)
+        # Initial Conv with Regularization
+        x = layers.Conv2D(64, (3, 3), padding='same', kernel_regularizer=reg)(input_layer)
         x = layers.BatchNormalization()(x)
         x = layers.Activation('relu')(x)
 
-        # Residual Blocks (AlphaZero uses 19 or 39, we'll start with 4 for speed)
+        # Residual Blocks
         for _ in range(4):
-            x = self._residual_block(x, filters=64)
+            x = self._residual_block(x, 64, reg)
 
         # Policy Head
-        p = layers.Conv2D(filters=2, kernel_size=(1, 1), padding='same')(x)
+        p = layers.Conv2D(2, (1, 1), padding='same', kernel_regularizer=reg)(x)
         p = layers.BatchNormalization()(p)
         p = layers.Activation('relu')(p)
         p = layers.Flatten()(p)
-        policy_output = layers.Dense(self.move_mapping.num_actions, activation='softmax', name='policy')(p)
+        policy_output = layers.Dense(self.move_mapping.num_actions, activation='softmax', name='policy', kernel_regularizer=reg)(p)
 
         # Value Head
-        v = layers.Conv2D(filters=1, kernel_size=(1, 1), padding='same')(x)
+        v = layers.Conv2D(1, (1, 1), padding='same', kernel_regularizer=reg)(x)
         v = layers.BatchNormalization()(v)
         v = layers.Activation('relu')(v)
         v = layers.Flatten()(v)
-        v = layers.Dense(64, activation='relu')(v)
-        value_output = layers.Dense(1, activation='tanh', name='value')(v)
+        v = layers.Dense(64, activation='relu', kernel_regularizer=reg)(v)
+        value_output = layers.Dense(1, activation='tanh', name='value', kernel_regularizer=reg)(v)
 
-        # Create the model
         model = models.Model(inputs=input_layer, outputs=[policy_output, value_output])
-
+        
+        # Compile with weighted loss (AlphaZero usually weights value loss slightly less or equal)
         opt = Adam(learning_rate=self.learning_rate)
-        model.compile(optimizer=opt, loss=['categorical_crossentropy', 'mean_squared_error'], metrics=['accuracy','accuracy'])
+        model.compile(
+            optimizer=opt, 
+            loss={'policy': 'categorical_crossentropy', 'value': 'mean_squared_error'},
+            loss_weights={'policy': 1.0, 'value': 1.0}, # Adjust weights if needed
+            metrics=['accuracy']
+        )
 
         return model
 
-    def _residual_block(self, x, filters):
+    def _residual_block(self, x, filters, reg):
         shortcut = x
-        
-        # First Conv
-        x = layers.Conv2D(filters=filters, kernel_size=(3, 3), padding='same')(x)
+        x = layers.Conv2D(filters, (3, 3), padding='same', kernel_regularizer=reg)(x)
         x = layers.BatchNormalization()(x)
         x = layers.Activation('relu')(x)
-        
-        # Second Conv
-        x = layers.Conv2D(filters=filters, kernel_size=(3, 3), padding='same')(x)
+        x = layers.Conv2D(filters, (3, 3), padding='same', kernel_regularizer=reg)(x)
         x = layers.BatchNormalization()(x)
-        
-        # Add Skip Connection
         x = layers.Add()([x, shortcut])
         x = layers.Activation('relu')(x)
-        
         return x
-
+    
     def update_target_model(self):
         self.target_model.set_weights(self.model.get_weights())
 
@@ -351,28 +351,31 @@ class MCTSAgent():
         return best_child.move, improved_policy, v_pi
 
 
-    def replay(self, batch_size):
-        if len(self.memory) < batch_size:
-            print(len(self.memory), "memory < batch_size; skipping replay")
+    def replay(self, batch_size, epochs=1):
+        min_memory = 1000
+        if len(self.memory) < min_memory:
             return
 
-        print("Replaying...")
+        # 1. Sample a larger pool of data (e.g., 2048 or 4096 samples)
+        # This reduces the correlation between consecutive updates
+        sample_size = min(len(self.memory), 4096) 
+        minibatch = random.sample(self.memory, sample_size)
 
-        # Sample a minibatch
-        # Train on multiple batches to see more data without overfitting one batch
-        training_steps = 4
-        for _ in range(training_steps):
-            minibatch = random.sample(self.memory, batch_size)
+        # 2. Vectorized Unpacking (Much faster than list comps in a loop)
+        # We transpose the list of tuples: [(s,p,v), (s,p,v)] -> [s,s], [p,p], [v,v]
+        states, policies, values = map(np.array, zip(*minibatch))
 
-            states = np.array([x[0] for x in minibatch], dtype=np.float32)
-            targets_pi = np.array([x[1] for x in minibatch], dtype=np.float32)
-            targets_v = np.array([x[2] for x in minibatch], dtype=np.float32)
-
-            self.model.fit(
-                states,
-                [targets_pi, targets_v],
-                epochs=1, 
-            )
+        # 3. Fit in one go
+        # shuffle=True ensures the batches are randomized internally
+        # verbose=0 keeps your console clean during self-play
+        self.model.fit(
+            states,
+            {'policy': policies, 'value': values},
+            batch_size=batch_size,
+            epochs=epochs,
+            shuffle=True,
+            verbose=0
+        )
 
     def load(self, name):
         self.model.load_weights(name)

@@ -1,7 +1,6 @@
-import os
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 import random
 from collections import deque
+import os
 import chess
 import numpy as np
 
@@ -14,7 +13,7 @@ import argparse
 def train_agent(start_fen=None):
     # Training parameters
     n_episodes = 10000
-    n_simulations = 100 
+    n_simulations = 50
     batch_size = 256
 
     # Initialize environment and agent
@@ -24,11 +23,11 @@ def train_agent(start_fen=None):
     agent = MCTSAgent(state_size=state_size, n_simulations=n_simulations)
     
     episodes = n_episodes
-    checkpoint_frequency = 1 # Train every episode
+    checkpoint_frequency = 3
     target_update_frequency = 10  # Update target model less frequently for stability
 
     import tensorflow as tf
-    # print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
 
     model_file = "model_checkpoint.weights.h5"
 
@@ -74,11 +73,12 @@ def train_agent(start_fen=None):
 
             # Play move
             _, reward, done = env.step(move)
+            print(env.board.unicode())
             moves_made += 1
             mates += reward
 
-            # print(f"Move {moves_made}: {move}, done={done}")
-            # print(env.board.unicode())
+            print(f"Move {moves_made}: {move}, done={done}")
+            print(env.board.unicode())
 
         # ----- game finished or max_moves reached -----
         # Use final game result as value target z
