@@ -63,7 +63,7 @@ class MCTSAgent():
             optimizer=opt, 
             loss={'policy': 'categorical_crossentropy', 'value': 'mean_squared_error'},
             loss_weights={'policy': 1.0, 'value': 1.0}, # Adjust weights if needed
-            metrics=['accuracy']
+            metrics=['accuracy','accuracy']
         )
 
         return model
