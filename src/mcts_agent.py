@@ -10,6 +10,7 @@ from src.mcts_node import MCTSNode
 from src.utils.utilities import *
 from src.utils.move_mapping import MoveMapping
 from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import regularizers
 
 class MCTSAgent():
     def __init__(self, state_size, n_simulations=100):
