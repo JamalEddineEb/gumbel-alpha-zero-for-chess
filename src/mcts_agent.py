@@ -11,6 +11,7 @@ from src.utils.utilities import *
 from src.utils.move_mapping import MoveMapping
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import regularizers
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
 class MCTSAgent():
     def __init__(self, state_size, n_simulations=100):
@@ -32,13 +33,13 @@ class MCTSAgent():
         input_layer = layers.Input(shape=(8, 8, 12))
 
         # Initial Conv with Regularization
-        x = layers.Conv2D(64, (3, 3), padding='same', kernel_regularizer=reg)(input_layer)
+        x = layers.Conv2D(128, (3, 3), padding='same', kernel_regularizer=reg)(input_layer)
         x = layers.BatchNormalization()(x)
         x = layers.Activation('relu')(x)
 
         # Residual Blocks
         for _ in range(4):
-            x = self._residual_block(x, 64, reg)
+            x = self._residual_block(x, 128, reg)
 
         # Policy Head
         p = layers.Conv2D(2, (1, 1), padding='same', kernel_regularizer=reg)(x)
@@ -52,13 +53,19 @@ class MCTSAgent():
         v = layers.BatchNormalization()(v)
         v = layers.Activation('relu')(v)
         v = layers.Flatten()(v)
-        v = layers.Dense(64, activation='relu', kernel_regularizer=reg)(v)
+        v = layers.Dense(128, activation='relu', kernel_regularizer=reg)(v)
         value_output = layers.Dense(1, activation='tanh', name='value', kernel_regularizer=reg)(v)
 
         model = models.Model(inputs=input_layer, outputs=[policy_output, value_output])
-        
-        # Compile with weighted loss (AlphaZero usually weights value loss slightly less or equal)
-        opt = Adam(learning_rate=self.learning_rate)
+
+        lr_schedule = ExponentialDecay(
+            initial_learning_rate=2e-3,  
+            decay_steps=5000,            
+            decay_rate=0.94,             
+            staircase=True
+        )
+            
+        opt = Adam(learning_rate=lr_schedule)
         model.compile(
             optimizer=opt, 
             loss={'policy': 'categorical_crossentropy', 'value': 'mean_squared_error'},
@@ -366,9 +373,10 @@ class MCTSAgent():
         # We transpose the list of tuples: [(s,p,v), (s,p,v)] -> [s,s], [p,p], [v,v]
         states, policies, values = map(np.array, zip(*minibatch))
 
+        print(f"Current LR: {self.model.optimizer._decayed_lr(tf.float32).numpy():.6f}")
+
         # 3. Fit in one go
         # shuffle=True ensures the batches are randomized internally
-        # verbose=0 keeps your console clean during self-play
         self.model.fit(
             states,
             {'policy': policies, 'value': values},

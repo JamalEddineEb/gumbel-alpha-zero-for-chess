@@ -129,6 +129,7 @@ def train_agent(start_fen=None):
 
         # --- TRAINING STEP -----------------------------------------
         if len(agent.memory) >= batch_size and e % checkpoint_frequency == 0:
+            print("Replaying ..")
             agent.replay(batch_size)
             agent.save(model_file)
 
