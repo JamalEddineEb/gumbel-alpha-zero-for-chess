@@ -20,7 +20,7 @@ class MCTSAgent():
         self.n_simulations = n_simulations
         self.move_mapping = MoveMapping()
         self.learning_rate = 0.0005
-        self.c_scale = 1
+        self.c_scale = 2
         self.c_visit = 50
         self.model = self._build_model()
         self.target_model = self._build_model()
@@ -327,12 +327,8 @@ class MCTSAgent():
                 budget_per_candidate,
             )
 
-        # Choose best candidate by mean action-value Q = value / visits
-        def mean_q(child):
-            # Negate for root perspective
-            return -child.value / child.visits if child.visits > 0 else -1e9
-
-        best_child = max(current_candidates, key=mean_q)
+       
+        best_child = current_candidates[0]
 
         # --- POLICY IMPROVEMENT AT ROOT ---------------------------------
         state = env.get_state()
