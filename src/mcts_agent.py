@@ -369,7 +369,14 @@ class MCTSAgent():
         # We transpose the list of tuples: [(s,p,v), (s,p,v)] -> [s,s], [p,p], [v,v]
         states, policies, values = map(np.array, zip(*minibatch))
 
-        print(f"Current LR: {self.model.optimizer._decayed_lr(tf.float32).numpy():.6f}")
+        step = self.model.optimizer.iterations
+
+        # 2. Calculate the specific LR for this step using the schedule
+        # (We use the schedule function we created earlier)
+        current_lr = self.model.optimizer.learning_rate(step)
+
+        print(f"Current LR: {current_lr.numpy():.6f}")
+
 
         # 3. Fit in one go
         # shuffle=True ensures the batches are randomized internally
