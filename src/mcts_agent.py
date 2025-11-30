@@ -17,7 +17,7 @@ import tensorflow as tf
 
 class PrintLRCallback(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
-        lr = self.model.optimizer.lr
+        lr = self.model.optimizer.learning_rate
         # If lr uses a schedule, call it with optimizer.iterations
         if callable(lr):
             lr = lr(self.model.optimizer.iterations)
