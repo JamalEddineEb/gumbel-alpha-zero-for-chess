@@ -13,6 +13,17 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import regularizers
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
+import tensorflow as tf
+
+class PrintLRCallback(tf.keras.callbacks.Callback):
+    def on_epoch_end(self, epoch, logs=None):
+        lr = self.model.optimizer.lr
+        # If lr uses a schedule, call it with optimizer.iterations
+        if callable(lr):
+            lr = lr(self.model.optimizer.iterations)
+        print(f"Epoch {epoch+1}: learning rate = {float(lr.numpy()):.8f}")
+
+
 class MCTSAgent():
     def __init__(self, state_size, n_simulations=100):
         self.state_size = state_size
@@ -69,8 +80,9 @@ class MCTSAgent():
         model.compile(
             optimizer=opt, 
             loss={'policy': 'categorical_crossentropy', 'value': 'mean_squared_error'},
-            loss_weights={'policy': 1.0, 'value': 1.0}, # Adjust weights if needed
-            metrics=['accuracy','accuracy']
+            loss_weights={'policy': 1.0, 'value': 1.0}, 
+            metrics=['accuracy','accuracy'],
+            callbacks=[PrintLRCallback()]
         )
 
         return model
