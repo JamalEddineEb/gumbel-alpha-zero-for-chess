@@ -130,11 +130,3 @@ The network is trained to match an improved policy $\pi'$:
 $$ \pi' \propto \text{softmax}(\text{logits} + \sigma(Q_{completed})) $$
 
 This ensures the network learns from the *search-improved* values rather than just raw visit counts.
-
----
-
-## 📊 Performance
-
-The agent is evaluated on:
-- **Win Rate**: Percentage of games won against Stockfish (Level 2+).
-- **Mate Efficiency**: Average number of moves to deliver checkmate compared to tablebase optimality.
