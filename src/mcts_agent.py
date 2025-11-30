@@ -81,8 +81,7 @@ class MCTSAgent():
             optimizer=opt, 
             loss={'policy': 'categorical_crossentropy', 'value': 'mean_squared_error'},
             loss_weights={'policy': 1.0, 'value': 1.0}, 
-            metrics=['accuracy','accuracy'],
-            callbacks=[PrintLRCallback()]
+            metrics=['accuracy','accuracy']
         )
 
         return model
@@ -390,6 +389,7 @@ class MCTSAgent():
             batch_size=batch_size,
             epochs=epochs,
             shuffle=True,
+            callbacks=[PrintLRCallback()]
         )
 
     def load(self, name):
