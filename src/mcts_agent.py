@@ -11,6 +11,7 @@ from src.utils.move_mapping import MoveMapping
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import regularizers
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
+import tensorflow as tf
 
 class PrintLRCallback(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
