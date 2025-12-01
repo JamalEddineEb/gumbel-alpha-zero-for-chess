@@ -24,7 +24,7 @@ def train_agent(start_fen=None):
     
     episodes = n_episodes
     checkpoint_frequency = 3
-    target_update_frequency = 10  # Update target model less frequently for stability
+    target_update_frequency = 10 
 
     import tensorflow as tf
     print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))

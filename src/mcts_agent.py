@@ -1,6 +1,5 @@
 import chess
 import numpy as np
-import json
 import random 
 
 from collections import deque
@@ -13,15 +12,10 @@ from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import regularizers
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
-import tensorflow as tf
-
 class PrintLRCallback(tf.keras.callbacks.Callback):
     def on_epoch_end(self, epoch, logs=None):
-        lr = self.model.optimizer.learning_rate
-        # If lr uses a schedule, call it with optimizer.iterations
-        if callable(lr):
-            lr = lr(self.model.optimizer.iterations)
-        print(f"Epoch {epoch+1}: learning rate = {float(lr.numpy()):.8f}")
+        lr = float(self.model.optimizer.learning_rate(self.model.optimizer.iterations))
+        print(f"LR @ epoch {epoch+1}: {lr:.8f}")
 
 
 class MCTSAgent():
@@ -389,7 +383,7 @@ class MCTSAgent():
             batch_size=batch_size,
             epochs=epochs,
             shuffle=True,
-            callbacks=[PrintLRCallback()]
+            callbacks=[PrintLRCallback]
         )
 
     def load(self, name):
