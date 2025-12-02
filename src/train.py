@@ -73,7 +73,6 @@ def train_agent(start_fen=None):
 
             # Play move
             _, reward, done = env.step(move)
-            print(env.board.unicode())
             moves_made += 1
             mates += reward
 
