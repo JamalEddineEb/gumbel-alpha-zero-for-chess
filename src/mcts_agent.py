@@ -1,5 +1,6 @@
 import chess
 import numpy as np
+import json
 import random 
 
 from collections import deque
@@ -11,13 +12,6 @@ from src.utils.move_mapping import MoveMapping
 from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import regularizers
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
-import tensorflow as tf
-
-class PrintLRCallback(tf.keras.callbacks.Callback):
-    def on_epoch_end(self, epoch, logs=None):
-        lr = float(self.model.optimizer.learning_rate(self.model.optimizer.iterations))
-        print(f"LR @ epoch {epoch+1}: {lr:.8f}")
-
 
 class MCTSAgent():
     def __init__(self, state_size, n_simulations=100):
@@ -384,7 +378,6 @@ class MCTSAgent():
             batch_size=batch_size,
             epochs=epochs,
             shuffle=True,
-            callbacks=[PrintLRCallback]
         )
 
     def load(self, name):
