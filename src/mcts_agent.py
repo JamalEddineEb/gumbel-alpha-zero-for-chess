@@ -59,11 +59,12 @@ class MCTSAgent():
         model = models.Model(inputs=input_layer, outputs=[policy_output, value_output])
 
         lr_schedule = ExponentialDecay(
-            initial_learning_rate=2e-3,  
-            decay_steps=5000,            
-            decay_rate=0.94,             
+            initial_learning_rate=0.0005,  
+            decay_steps=1000,            
+            decay_rate=0.96,             
             staircase=True
         )
+        
             
         opt = Adam(learning_rate=lr_schedule)
         model.compile(
