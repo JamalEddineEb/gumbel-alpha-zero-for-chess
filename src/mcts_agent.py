@@ -355,7 +355,7 @@ class MCTSAgent():
         return best_child.move, improved_policy, v_pi
 
 
-    def replay(self, batch_size, epochs=4):
+    def replay(self, batch_size, epochs=1):
         min_memory = 1000
         if len(self.memory) < min_memory:
             return
