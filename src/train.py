@@ -13,7 +13,7 @@ import argparse
 def train_agent(start_fen=None):
     # Training parameters
     n_episodes = 10000
-    n_simulations = 50
+    n_simulations = 100
     batch_size = 256
 
     # Initialize environment and agent
@@ -55,7 +55,7 @@ def train_agent(start_fen=None):
 
         print(f"episode {e}")
 
-        max_moves = 50  # prevent endless shuffling
+        max_moves = 200  
 
         while not env.done and moves_made < max_moves:
             state = env.get_state()
