@@ -14,7 +14,7 @@ from tensorflow.keras import regularizers
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
 class MCTSAgent():
-    def __init__(self, state_size, n_simulations=100):
+    def __init__(self, state_size, n_simulations=200):
         self.state_size = state_size
         self.memory = deque(maxlen=50000)
         self.n_simulations = n_simulations
