@@ -20,30 +20,38 @@ class MCTSNode:
                 self.children[move] = MCTSNode(prior=priors.get(move,0.0),move=move)
 
     def expand_leaf(self, env, model):
+        self.expanded = True
+        
+        state = env.get_state()
+        # Predict using the model (call directly for speed/stability instead of .predict)
+        # Output is [policy_probs, value]
+        policy_probs, value = model(state[None], training=False)
+        
+        # Convert tensors to numpy
+        policy_probs = policy_probs.numpy()[0]
+        value = float(value.numpy()[0])
+        
+        # Mask illegal moves
+        legal_moves = list(env.get_legal_actions()) # Changed from env.board.legal_moves to env.get_legal_actions() to match original logic
+        
+        # Create children
         move_mapping = MoveMapping()
-
-        # Evaluate leaf with the network
-        policy, value = model.predict(
-            np.expand_dims(env.get_state(), axis=0), verbose=0
-        )
-        policy = policy[0]
-        value = float(value[0])
-
-        # Create children with priors for legal moves
-        legal_moves = list(env.get_legal_actions())
+        
+        # Prepare priors for the expand method
         priors = {}
-        # normalize priors across legal moves
         total_p = 0.0
-        for mv in legal_moves:
-            mv_idx = move_mapping.get_index(mv.uci())
-            p = max(1e-12, policy[mv_idx])
-            priors[mv] = p
+        for move in legal_moves:
+            uci = move.uci()
+            idx = move_mapping.get_index(uci)
+            p = max(1e-12, policy_probs[idx]) # Ensure prior is not zero
+            priors[move] = p
             total_p += p
-        for mv in legal_moves:
-            priors[mv] /= total_p
+        
+        # Normalize priors
+        for move in legal_moves:
+            priors[move] /= total_p
 
         self.expand(legal_moves, priors) 
-        self.expanded = True
         return value
 
     def update(self, value):

@@ -1,66 +1,132 @@
-# 🌟 Project Brief: Gumbel AlphaZero for KRK Endgame
+# ♟️ Gumbel AlphaZero for Chess
 
-## 💡 1. Project Overview
+![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
+![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-orange)
+![License](https://img.shields.io/badge/License-MIT-green)
 
-This project implements a sophisticated **Gumbel AlphaZero (GAZ)** agent to master the **King and Rook vs. King (KRK)** chess endgame. The agent combines a deep convolutional neural network with a state-of-the-art tree search algorithm, demonstrating superior sample efficiency compared to traditional AlphaZero and MuZero.
+A sophisticated **Gumbel AlphaZero (GAZ)** agent designed to master **Chess**. This project demonstrates the power of combining deep convolutional neural networks with **Sequential Halving MCTS** and **Gumbel noise exploration**, achieving superior sample efficiency compared to traditional AlphaZero methods.
 
-### Key Features
-* **Gumbel-Max Trick:** Uses Gumbel noise sampling for action selection, enabling effective exploration with a minimal number of simulations ($N$).
-* **Sequential Halving:** Implements a highly efficient search budget allocation strategy for MCTS. 
-* **Two-Headed Neural Network:** A modern architecture with separate heads for **Policy** (move selection) and **Value** (board evaluation).
-* **Strong Opponent Baseline:** Trains against the powerful **Stockfish** engine to guarantee high-quality self-play data.
+While the default training loop focuses on the **King and Queen vs. King (KQK)** endgame for rapid demonstration, the agent and architecture are fully capable of training on **any chess position** or full games.
 
----
-
-## 🧠 2. Algorithmic Detail: The Gumbel Advantage
-
-The agent's strength lies in its ability to achieve high-quality policy improvement with a minimal simulation budget. This is achieved by focusing computational effort only on the most promising moves.
-
-### Advanced Search Strategy: Sequential Halving
-Instead of deep, uniform search, the agent uses a **Sequential Halving** process over the **Gumbel Top-$k$** candidates selected at the root. This progressively eliminates low-value actions, concentrating simulations where they matter most.
-
-### Policy Target Construction (The High-Quality Label)
-The network is trained to match an "improved policy" ($\pi'$) derived directly from the search results, where the original network logits ($\mathbf{L}$) are corrected by the search's completed Q-values ($\mathbf{Q}$):
-
-$$\pi' \propto \text{softmax}(\mathbf{L} + \sigma(\mathbf{Q}))$$
-
-* **$\mathbf{Q}$ (Completed Q-Values):** Uses the search-improved value ($V/N$) for visited actions, and the network's value ($V_\pi$) as a reliable fallback for unvisited actions.
-* **Impact:** This high-quality, aggregated label allows the agent to learn the optimal policy with drastically fewer training episodes.
+![Agent in Action](images/mate.png)
+*Figure 1: The agent (White) delivering a checkmate against the Stockfish engine.*
 
 ---
 
-## 📈 3. Key Performance and Technical Architecture
+## 🌟 Key Features
 
-### Architecture Diagram
-The codebase is organized into modular files, reflecting best practices for Deep Reinforcement Learning frameworks.
-
-
-
-* **`mcts_agent.py`**: The core intelligence, containing the **MCTS algorithm**, the two-headed **Keras/TensorFlow model definition**, and the $\pi'$ label computation logic.
-* **`environment.py`**: The game environment, managing the board state, rule checking, and running the **Stockfish** opponent.
-* **`train.py`**: The primary self-play loop for data generation, collecting the training samples $(\mathbf{s}, \mathbf{\pi'}, \mathbf{z})$.
-
-### Performance Indicators (KPIs)
-The agent's success is defined by rapid convergence to a super-human level on the KRK task.
-
-* **Win Rate:** Should quickly exceed 95% against Stockfish.
-* **Average Game Length:** The number of moves to mate should decrease significantly as the policy learns optimal forcing sequences.
-
-
+- **🚀 Gumbel-Max Exploration**: Uses Gumbel noise sampling for robust action selection without the need for high simulation counts ($N$).
+- **📉 Sequential Halving**: Implements an efficient search budget allocation strategy, progressively pruning low-value branches.
+- **🧠 Two-Headed Architecture**: Features a modern CNN with separate heads for **Policy** (move probabilities) and **Value** (win/loss estimation).
+- **🤖 Stockfish Baseline**: Trains against the world-class **Stockfish** engine to ensure high-quality self-play data and rigorous evaluation.
+- **🌐 General Purpose**: Supports loading any board state via FEN or PGN for training and inference.
+- **🐳 Docker Support**: Fully containerized environment for easy reproducibility.
 
 ---
 
-## 🚀 4. Getting Started
+## 📂 Project Structure
+
+```
+chess-endgame-mcts/
+├── docker-compose.yml      # Docker services configuration
+├── dockerfile              # Docker image definition
+├── images/                 # Project assets
+│   └── mate.png
+├── model_checkpoint.weights.h5  # Trained model weights
+├── readme.md               # Project documentation
+├── requirements.txt        # Python dependencies
+└── src/                    # Source code
+    ├── chess_renderer.py   # PyQt5 GUI for visualization
+    ├── environment.py      # Chess environment & Stockfish wrapper
+    ├── mcts_agent.py       # MCTS algorithm & Neural Network
+    ├── mcts_node.py        # Tree search node definition
+    ├── play.py             # Inference script (GUI/Headless)
+    ├── train.py            # Training loop (Self-play)
+    └── utils/              # Helper utilities
+```
+
+---
+
+## 🚀 Getting Started
 
 ### Prerequisites
-* Python 3.8+
-* `tensorflow`, `keras`, `python-chess`, `PyQt5`
-* **Stockfish** executable must be installed and correctly linked in `environment.py`.
 
-### Execution
-| Command | Purpose |
-| :--- | :--- |
-| `python -m src.train` | Starts the self-play loop and trains the model, saving weights to `model_checkpoint.weights.h5`. |
-| `python -m src.play` | Runs the trained agent in a real-time demo, rendering the moves via PyQt5/SVG. |
+- **Python 3.8+**
+- **Stockfish**: Must be installed and accessible in your system path (or configured in `src/environment.py`).
+
+### 📦 Installation
+
+#### Option A: Local Setup
+
+1.  Clone the repository:
+    ```bash
+    git clone https://github.com/yourusername/chess-endgame-mcts.git
+    cd chess-endgame-mcts
+    ```
+
+2.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+#### Option B: Docker (Recommended)
+
+1.  Build and run the container:
+    ```bash
+    docker-compose up --build
+    ```
 
 ---
+
+## 💻 Usage
+
+### 1. Training the Agent
+
+Start the self-play training loop. By default, it generates random **KQK** positions.
+
+```bash
+python -m src.train
+```
+
+**Arguments:**
+- `--fen <string>`: Start training from a specific FEN position (e.g., full starting position).
+- `--pgn <path>`: Load a starting position from a PGN file.
+
+**Example (Full Game Training):**
+```bash
+python -m src.train --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+```
+
+### 2. Playing / Demo
+
+Watch the trained agent play in real-time.
+
+```bash
+python -m src.play
+```
+
+**Arguments:**
+- `--fen <string>`: Set the starting board position.
+- `--headless`: Run without the GUI (terminal output only).
+
+**Example (Custom Endgame):**
+```bash
+python -m src.play --fen "8/8/3k4/8/8/3K1Q2/8/8 w - - 0 1"
+```
+
+---
+
+## 🧠 Algorithmic Details
+
+### The Gumbel Advantage
+Traditional AlphaZero relies on PUCT (Predictor + Upper Confidence Bound applied to Trees) which requires many simulations to visit nodes. **Gumbel AlphaZero** improves this by:
+
+1.  **Sampling**: Using Gumbel noise to select a set of candidate actions at the root.
+2.  **Sequential Halving**: Allocating the simulation budget dynamically. If we have $N$ simulations, we evaluate $K$ candidates, then keep the top $K/2$, then $K/4$, and so on, doubling the visits for the survivors at each stage.
+
+### Policy Improvement Target
+The network is trained to match an improved policy $\pi'$:
+
+$$ \pi' \propto \text{softmax}(\text{logits} + \sigma(Q_{completed})) $$
+
+This ensures the network learns from the *search-improved* values rather than just raw visit counts.

@@ -1,33 +1,54 @@
-import random
-import json
 import sys
-import numpy as np
-from PyQt5.QtWidgets import QApplication
-from PyQt5.QtCore import QTimer
+import argparse
+import time
 
 from src.mcts_agent import MCTSAgent
-from src.environment import RookKingEnv
-from src.chess_renderer import ChessRenderer
+from src.environment import ChessEnv
+
+# Parse arguments
+parser = argparse.ArgumentParser(description='Play Chess with MCTS Agent')
+parser.add_argument('--fen', type=str, help='Starting FEN string')
+parser.add_argument('--headless', action='store_true', help='Run without GUI')
+args = parser.parse_args()
 
 # --- setup ---
-state_size = 8 * 8 * 3  # 8x8 board with 3 channels
-agent = MCTSAgent(state_size, n_simulations=2)
+state_size = (8, 8, 12)  # 8x8 board with 12 channels
+agent = MCTSAgent(state_size, n_simulations=100)
 
 model_file = "model_checkpoint.weights.h5"
 print(f"Loading model from {model_file}")
-agent.load(model_file)
+try:
+    agent.load(model_file)
+except Exception as e:
+    print(f"Could not load model: {e}")
+    print("Starting with random weights.")
 
-env = RookKingEnv(stage=2)
+env = ChessEnv(demo_mode=False)
+env.reset(fen=args.fen)
 
-# --- Qt app / UI ---
-app = QApplication.instance() or QApplication(sys.argv)
-renderer = ChessRenderer(env.board)
-renderer.show()
-renderer.update_board()  # initial paint
+# Try to use GUI if not headless
+use_gui = not args.headless
+renderer = None
 
-MOVE_DELAY_MS = 800  # visual pacing between moves
+if use_gui:
+    try:
+        from PyQt5.QtWidgets import QApplication
+        from PyQt5.QtCore import QTimer
+        from src.chess_renderer import ChessRenderer
+        
+        app = QApplication.instance() or QApplication(sys.argv)
+        renderer = ChessRenderer(env.board)
+        renderer.show()
+        renderer.update_board()
+        print("GUI mode enabled")
+    except Exception as e:
+        print(f"Could not initialize GUI: {e}")
+        print("Falling back to headless mode")
+        use_gui = False
 
-def play_step():
+MOVE_DELAY_MS = 800 
+
+def play_step_gui():
     if env.board.is_game_over():
         print(f"Game over: {env.board.result()}")
         return
@@ -38,18 +59,40 @@ def play_step():
         print("No legal move; stopping.")
         return
 
-    env.step_with_opponent(move)
+    print(f"Move: {move}")
+    env.step(move)
     renderer.update_board()
 
     if env.board.is_game_over():
         print(f"Game over: {env.board.result()}")
         return
 
-    QTimer.singleShot(MOVE_DELAY_MS, play_step)
+    QTimer.singleShot(MOVE_DELAY_MS, play_step_gui)
 
+def play_headless():
+    move_count = 0
+    max_moves = 100
+    
+    while not env.board.is_game_over() and move_count < max_moves:
+        # Agent move via MCTS
+        move, _, _ = agent.simulate(env)
+        if move is None:
+            print("No legal move; stopping.")
+            break
 
+        print(f"Move {move_count + 1}: {move}")
+        env.step(move)
+        print(env.board.unicode())
+        print()
+        
+        move_count += 1
+        time.sleep(0.5)  # Small delay for readability
 
-# start loop after small delay so first frame shows
-QTimer.singleShot(MOVE_DELAY_MS, play_step)
+    print(f"Game over: {env.board.result()}")
 
-sys.exit(app.exec_())
+if use_gui:
+    # start loop after small delay so first frame shows
+    QTimer.singleShot(MOVE_DELAY_MS, play_step_gui)
+    sys.exit(app.exec_())
+else:
+    play_headless()

@@ -1,5 +1,3 @@
-/*.h5
-__pycache__
+**/__pycache__
 .venv10
 chess_env/
-*.h5

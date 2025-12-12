@@ -1,82 +1,112 @@
 import chess
 import numpy as np
 import json
+import random 
+
 from collections import deque
 from keras import layers, models
 import math
 from src.mcts_node import MCTSNode
 from src.utils.utilities import *
 from src.utils.move_mapping import MoveMapping
-
+from tensorflow.keras.optimizers import Adam
+from tensorflow.keras import regularizers
+from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
 class MCTSAgent():
-    def __init__(self, state_size, n_simulations=20):
+    def __init__(self, state_size, n_simulations=200):
         self.state_size = state_size
-        self.memory = deque(maxlen=10000)
+        self.memory = deque(maxlen=50000)
         self.n_simulations = n_simulations
         self.move_mapping = MoveMapping()
-        self.gamma = 0.95
-        self.epsilon = 1
-        self.epsilon_decay = 0.9998
-        self.epsilon_min = 0.1
-        self.learning_rate = 0.001
-        self.c_scale = 1
+        self.learning_rate = 0.0005
+        self.c_scale = 2
         self.c_visit = 50
         self.model = self._build_model()
         self.target_model = self._build_model()
         self.update_target_model()
 
     def _build_model(self):
-        # Input layer for an 8x8 chessboard with 3 channels
-        input_layer = layers.Input(shape=(8, 8, 3))
+        # Standard AlphaZero weight decay
+        reg = regularizers.l2(1e-4)
 
-        # Convolutional Block 1
-        x = layers.Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same')(input_layer)
+        input_layer = layers.Input(shape=(8, 8, 12))
+
+        # Initial Conv with Regularization
+        x = layers.Conv2D(128, (3, 3), padding='same', kernel_regularizer=reg)(input_layer)
         x = layers.BatchNormalization()(x)
-        x = layers.Conv2D(filters=128, kernel_size=(3, 3), activation='relu', padding='same')(x)
-        x = layers.BatchNormalization()(x)
-        x = layers.MaxPooling2D(pool_size=(2, 2))(x)
-        
-        # Convolutional Block 2
-        x = layers.Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same')(x)
-        x = layers.BatchNormalization()(x)
-        x = layers.Conv2D(filters=256, kernel_size=(3, 3), activation='relu', padding='same')(x)
-        x = layers.BatchNormalization()(x)
-        x = layers.MaxPooling2D(pool_size=(2, 2))(x)
+        x = layers.Activation('relu')(x)
 
+        # Residual Blocks
+        for _ in range(4):
+            x = self._residual_block(x, 128, reg)
 
-        # Flatten the output from the convolutional layers
-        x = layers.Flatten()(x)
+        # Policy Head
+        p = layers.Conv2D(2, (1, 1), padding='same', kernel_regularizer=reg)(x)
+        p = layers.BatchNormalization()(p)
+        p = layers.Activation('relu')(p)
+        p = layers.Flatten()(p)
+        policy_output = layers.Dense(self.move_mapping.num_actions, activation='softmax', name='policy', kernel_regularizer=reg)(p)
 
-        # Policy head for move selection 
-        policy_output = layers.Dense(len(chess.SQUARES) * len(chess.SQUARES), activation='softmax', name='policy')(x)
+        # Value Head
+        v = layers.Conv2D(1, (1, 1), padding='same', kernel_regularizer=reg)(x)
+        v = layers.BatchNormalization()(v)
+        v = layers.Activation('relu')(v)
+        v = layers.Flatten()(v)
+        v = layers.Dense(128, activation='relu', kernel_regularizer=reg)(v)
+        value_output = layers.Dense(1, activation='tanh', name='value', kernel_regularizer=reg)(v)
 
-        # Value head for estimating the value of the current board state
-        value_output = layers.Dense(1, activation='tanh', name='value')(x)
-
-        # Create the model with both policy and value heads
         model = models.Model(inputs=input_layer, outputs=[policy_output, value_output])
-        model.compile(optimizer='adam', loss=['categorical_crossentropy', 'mean_squared_error'], metrics=['accuracy','accuracy'])
+
+        lr_schedule = ExponentialDecay(
+            initial_learning_rate=0.0005,  
+            decay_steps=1000,            
+            decay_rate=0.96,             
+            staircase=True
+        )
+        
+            
+        opt = Adam(learning_rate=lr_schedule)
+        model.compile(
+            optimizer=opt, 
+            loss={'policy': 'categorical_crossentropy', 'value': 'mean_squared_error'},
+            loss_weights={'policy': 1.0, 'value': 1.0}, 
+            metrics=['accuracy','accuracy']
+        )
 
         return model
 
+    def _residual_block(self, x, filters, reg):
+        shortcut = x
+        x = layers.Conv2D(filters, (3, 3), padding='same', kernel_regularizer=reg)(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.Activation('relu')(x)
+        x = layers.Conv2D(filters, (3, 3), padding='same', kernel_regularizer=reg)(x)
+        x = layers.BatchNormalization()(x)
+        x = layers.Add()([x, shortcut])
+        x = layers.Activation('relu')(x)
+        return x
+    
     def update_target_model(self):
         self.target_model.set_weights(self.model.get_weights())
 
     def get_state(self, board):
-        # Create a more informative state representation
-        state = np.zeros((8, 8, 3), dtype=np.float32)  # 3 channels: WK, BK, WR
+        # (8, 8, 12) representation
+        # Channels 0-5: White P, N, B, R, Q, K
+        # Channels 6-11: Black P, N, B, R, Q, K
+        state = np.zeros((8, 8, 12), dtype=np.float32)
 
         for square in chess.SQUARES:
             piece = board.piece_at(square)
             if piece:
+                # 0-5 for White, 6-11 for Black
+                piece_idx = piece.piece_type - 1  # 0=P, 1=N, ..., 5=K
+                if piece.color == chess.BLACK:
+                    piece_idx += 6
+                
                 rank = 7 - chess.square_rank(square)
                 file = chess.square_file(square)
-                if piece.piece_type == chess.KING:
-                    channel = 0 if piece.color == chess.WHITE else 1
-                    state[rank, file, channel] = 1.0
-                elif piece.piece_type == chess.ROOK and piece.color == chess.WHITE:
-                    state[rank, file, 2] = 1.0
+                state[rank, file, piece_idx] = 1.0
 
         return state
     
@@ -106,7 +136,8 @@ class MCTSAgent():
 
         for child in candidates:
             if child.visits > 0:
-                q = child.value / child.visits
+                # Value is from child's perspective (opponent), so negate for root
+                q = -child.value / child.visits
             else:
                 q = 0.0  # if never visited, treat as neutral
             # Eq. (8) style scaling: (c_visit + maxN) * c_scale * q
@@ -123,9 +154,9 @@ class MCTSAgent():
     def rollout_from_candidate(self, root, child, env, depth_limit=64):
         """
         One rollout:
-        - Force starting from root by playing 'child.move' (our move + Stockfish reply),
-          then follow deterministic non-root policy until leaf / terminal / depth_limit.
-        - Backup leaf value along the path.
+        - Play 'child.move' (1 ply).
+        - Follow deterministic non-root policy until leaf / terminal / depth_limit.
+        - Backup leaf value along the path (negating at each step).
         """
         path = [root, child]
 
@@ -133,17 +164,28 @@ class MCTSAgent():
         baseline = len(env.board.move_stack)
 
         if child.move not in env.board.legal_moves:
-            # print("Skip illegal child in rollout:", child.move)
             return
 
-        # 1) Apply the candidate move from the root + Stockfish reply
-        _, _, done = env.step_with_opponent(child.move)
+        # 1) Apply the candidate move (1 ply)
+        _, reward, done = env.step(child.move)
 
         node = child
         depth = 1
+        
+        leaf_value = 0.0
+
+        # If move caused termination (e.g. mate), reward is from parent's perspective
+        # But backup_path expects value from child's perspective, so negate
+        if done:
+             leaf_value = -reward  # Negate: reward is from parent, child is opponent
+             backup_path(path, leaf_value)
+             env.go_back(baseline)
+             return
 
         # Expand child once if needed
         if not node.expanded:
+            # expand_leaf returns value for the current player (who is about to move from node)
+            # i.e. the player at 'node'.
             leaf_value = node.expand_leaf(env, self.model)
             backup_path(path, leaf_value)
             env.go_back(baseline)
@@ -167,23 +209,20 @@ class MCTSAgent():
                 # print("Skip illegal next_child in rollout:", next_child.move)
                 break
 
-            # Play that move + Stockfish reply
-            _, _, done = env.step_with_opponent(next_child.move)
+            # Play that move
+            _, reward, done = env.step(next_child.move)
             node = next_child
             depth += 1
+            
+            if done:
+                # reward is from the player who just moved perspective
+                # Need to convert to last node's perspective (negate)
+                leaf_value = -reward
+                break
 
         # 3) Terminal handling or depth limit
-        if env.done:
-            result = env.board.result(claim_draw=True)
-            if result == "1-0":         # white mates (good)
-                leaf_value = 1.0
-            elif result == "1/2-1/2":   # stalemate / draw
-                leaf_value = 0.0
-            else:
-                leaf_value = -1.0       # "0-1" should never happen, treat as worst
-
-        else:
-            # Depth limit hit but game not over: evaluate with value head
+        if not done:
+             # Depth limit hit but game not over: evaluate with value head
             leaf_value = node.expand_leaf(env, self.model)
 
         backup_path(path, leaf_value)
@@ -195,11 +234,9 @@ class MCTSAgent():
     def compute_policy_improvement(self, root, state):
 
         # Step 1: get raw logits + value head vπ
-        # --- FIX: convert policy probabilities -> pseudo-logits ---
-
-        policy_probs, v_pi = self.model.predict(state[None], verbose=0)
-        policy_probs = policy_probs[0]     # shape = (4096,)
-        v_pi = float(v_pi[0])
+        policy_probs, v_pi = self.model(state[None], training=False)
+        policy_probs = policy_probs.numpy()[0]     # shape = (4096,)
+        v_pi = float(v_pi.numpy()[0])
 
         # numerical safety
         eps = 1e-8
@@ -216,7 +253,8 @@ class MCTSAgent():
         visits = []
         for move, child in root.children.items():
             if child.visits > 0:
-                q_val = child.value / child.visits
+                # Negate for root perspective
+                q_val = -child.value / child.visits
             else:
                 q_val = v_pi
             Q[move] = q_val
@@ -250,7 +288,7 @@ class MCTSAgent():
 
         return improved_policy, v_pi
 
-    def simulate(self, env, k_root=4):
+    def simulate(self, env, k_root=8):
         """"
         Run Gumbel-style root search and return:
         - best_move: chess.Move
@@ -290,11 +328,8 @@ class MCTSAgent():
                 budget_per_candidate,
             )
 
-        # Choose best candidate by mean action-value Q = value / visits
-        def mean_q(child):
-            return child.value / child.visits if child.visits > 0 else -1e9
-
-        best_child = max(current_candidates, key=mean_q)
+       
+        best_child = current_candidates[0]
 
         # --- POLICY IMPROVEMENT AT ROOT ---------------------------------
         state = env.get_state()
@@ -321,32 +356,30 @@ class MCTSAgent():
         return best_child.move, improved_policy, v_pi
 
 
-    def replay(self, batch_size):
-        if len(self.memory) < batch_size:
-            print(len(self.memory), "memory < batch_size; skipping replay")
+    def replay(self, batch_size, epochs=1):
+        min_memory = 1000
+        if len(self.memory) < min_memory:
             return
 
-        print("Replaying...")
+        # 1. Sample a larger pool of data (e.g., 2048 or 4096 samples)
+        # This reduces the correlation between consecutive updates
+        sample_size = min(len(self.memory), 4096) 
+        minibatch = random.sample(self.memory, sample_size)
 
-        # Sample a minibatch
-        import random
-        minibatch = random.sample(self.memory, batch_size)
-        minibatch = self.memory
+        # 2. Vectorized Unpacking (Much faster than list comps in a loop)
+        # We transpose the list of tuples: [(s,p,v), (s,p,v)] -> [s,s], [p,p], [v,v]
+        states, policies, values = map(np.array, zip(*minibatch))
 
-        states = np.array([x[0] for x in minibatch], dtype=np.float32)
-        targets_pi = np.array([x[1] for x in minibatch], dtype=np.float32)
-        targets_v = np.array([x[2] for x in minibatch], dtype=np.float32)
 
+        # 3. Fit in one go
+        # shuffle=True ensures the batches are randomized internally
         self.model.fit(
             states,
-            [targets_pi, targets_v],
-            epochs=3,
-            verbose=1,
+            {'policy': policies, 'value': values},
+            batch_size=batch_size,
+            epochs=epochs,
+            shuffle=True,
         )
-
-
-
-
 
     def load(self, name):
         self.model.load_weights(name)

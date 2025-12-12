@@ -1,0 +1,6 @@
+services:
+  chess-agent:
+    build: .
+    volumes:
+      - .:/home/app/chess-endgame-mcts
+    shm_size: 2gb

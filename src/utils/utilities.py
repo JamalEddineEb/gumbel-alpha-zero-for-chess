@@ -18,7 +18,9 @@ def gumbel_top_k_root_candidates(root, k):
 
     scores = {}
     for i, (move, child) in enumerate(root.children.items()):
-        scores[child] = child.prior + g[i]
+        # Add epsilon to avoid log(0)
+        logits = np.log(child.prior + 1e-9)
+        scores[child] = logits + g[i]
 
     sorted_moves = sorted(scores.items(), key=lambda x: x[1], reverse=True)
 
@@ -56,6 +58,7 @@ def backup_path(path, leaf_value):
     for n in reversed(path):
         n.visits += 1
         n.value += v
+        v = -v
 
 
 

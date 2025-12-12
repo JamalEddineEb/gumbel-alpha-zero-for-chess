@@ -37,6 +37,41 @@ class MoveMapping:
                 self.idx_to_move[idx] = uci
                 idx += 1
 
+        # Promotion moves
+        promotions = ['q', 'r', 'b', 'n']
+        
+        # White promotions: Rank 7 -> Rank 8
+        for f in range(8):
+            from_sq = chess.square(f, 6)
+            targets = [f]
+            if f > 0: targets.append(f - 1)
+            if f < 7: targets.append(f + 1)
+            
+            for t in targets:
+                to_sq = chess.square(t, 7)
+                base_uci = chess.SQUARE_NAMES[from_sq] + chess.SQUARE_NAMES[to_sq]
+                for p in promotions:
+                    uci = base_uci + p
+                    self.move_to_idx[uci] = idx
+                    self.idx_to_move[idx] = uci
+                    idx += 1
+
+        # Black promotions: Rank 2 -> Rank 1
+        for f in range(8):
+            from_sq = chess.square(f, 1)
+            targets = [f]
+            if f > 0: targets.append(f - 1)
+            if f < 7: targets.append(f + 1)
+            
+            for t in targets:
+                to_sq = chess.square(t, 0)
+                base_uci = chess.SQUARE_NAMES[from_sq] + chess.SQUARE_NAMES[to_sq]
+                for p in promotions:
+                    uci = base_uci + p
+                    self.move_to_idx[uci] = idx
+                    self.idx_to_move[idx] = uci
+                    idx += 1
+
 
     def get_index(self, move_uci: str) -> int:
         return self.move_to_idx[move_uci]
