@@ -1,9 +1,6 @@
-import random
-import json
 import sys
 import argparse
 import time
-import numpy as np
 
 from src.mcts_agent import MCTSAgent
 from src.environment import ChessEnv
@@ -16,7 +13,7 @@ args = parser.parse_args()
 
 # --- setup ---
 state_size = (8, 8, 12)  # 8x8 board with 12 channels
-agent = MCTSAgent(state_size, n_simulations=20)
+agent = MCTSAgent(state_size, n_simulations=100)
 
 model_file = "model_checkpoint.weights.h5"
 print(f"Loading model from {model_file}")
@@ -49,7 +46,7 @@ if use_gui:
         print("Falling back to headless mode")
         use_gui = False
 
-MOVE_DELAY_MS = 800  # visual pacing between moves
+MOVE_DELAY_MS = 800 
 
 def play_step_gui():
     if env.board.is_game_over():
