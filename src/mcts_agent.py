@@ -1,19 +1,20 @@
+import math
+import random
+from collections import deque
+
 import chess
 import numpy as np
-import json
-import random 
-
-from collections import deque
 from keras import layers, models
-import math
-from src.mcts_node import MCTSNode
-from src.utils.utilities import *
-from src.utils.move_mapping import MoveMapping
-from tensorflow.keras.optimizers import Adam
 from tensorflow.keras import regularizers
+from tensorflow.keras.optimizers import Adam
 from tensorflow.keras.optimizers.schedules import ExponentialDecay
 
-class MCTSAgent():
+from src.mcts_node import MCTSNode
+from src.utils.move_mapping import MoveMapping
+from src.utils.utilities import *
+
+
+class MCTSAgent:
     def __init__(self, state_size, n_simulations=200):
         self.state_size = state_size
         self.memory = deque(maxlen=50000)
@@ -33,60 +34,68 @@ class MCTSAgent():
         input_layer = layers.Input(shape=(8, 8, 12))
 
         # Initial Conv with Regularization
-        x = layers.Conv2D(128, (3, 3), padding='same', kernel_regularizer=reg)(input_layer)
+        x = layers.Conv2D(128, (3, 3), padding="same", kernel_regularizer=reg)(
+            input_layer
+        )
         x = layers.BatchNormalization()(x)
-        x = layers.Activation('relu')(x)
+        x = layers.Activation("relu")(x)
 
         # Residual Blocks
         for _ in range(4):
             x = self._residual_block(x, 128, reg)
 
         # Policy Head
-        p = layers.Conv2D(2, (1, 1), padding='same', kernel_regularizer=reg)(x)
+        p = layers.Conv2D(2, (1, 1), padding="same", kernel_regularizer=reg)(x)
         p = layers.BatchNormalization()(p)
-        p = layers.Activation('relu')(p)
+        p = layers.Activation("relu")(p)
         p = layers.Flatten()(p)
-        policy_output = layers.Dense(self.move_mapping.num_actions, activation='softmax', name='policy', kernel_regularizer=reg)(p)
+        policy_output = layers.Dense(
+            self.move_mapping.num_actions,
+            activation="softmax",
+            name="policy",
+            kernel_regularizer=reg,
+        )(p)
 
         # Value Head
-        v = layers.Conv2D(1, (1, 1), padding='same', kernel_regularizer=reg)(x)
+        v = layers.Conv2D(1, (1, 1), padding="same", kernel_regularizer=reg)(x)
         v = layers.BatchNormalization()(v)
-        v = layers.Activation('relu')(v)
+        v = layers.Activation("relu")(v)
         v = layers.Flatten()(v)
-        v = layers.Dense(128, activation='relu', kernel_regularizer=reg)(v)
-        value_output = layers.Dense(1, activation='tanh', name='value', kernel_regularizer=reg)(v)
+        v = layers.Dense(128, activation="relu", kernel_regularizer=reg)(v)
+        value_output = layers.Dense(
+            1, activation="tanh", name="value", kernel_regularizer=reg
+        )(v)
 
         model = models.Model(inputs=input_layer, outputs=[policy_output, value_output])
 
         lr_schedule = ExponentialDecay(
-            initial_learning_rate=0.0005,  
-            decay_steps=1000,            
-            decay_rate=0.96,             
-            staircase=True
+            initial_learning_rate=0.0005,
+            decay_steps=1000,
+            decay_rate=0.99,
+            staircase=True,
         )
-        
-            
+
         opt = Adam(learning_rate=lr_schedule)
         model.compile(
-            optimizer=opt, 
-            loss={'policy': 'categorical_crossentropy', 'value': 'mean_squared_error'},
-            loss_weights={'policy': 1.0, 'value': 1.0}, 
-            metrics=['accuracy','accuracy']
+            optimizer=opt,
+            loss={"policy": "categorical_crossentropy", "value": "mean_squared_error"},
+            loss_weights={"policy": 1.0, "value": 1.0},
+            metrics=["accuracy", "accuracy"],
         )
 
         return model
 
     def _residual_block(self, x, filters, reg):
         shortcut = x
-        x = layers.Conv2D(filters, (3, 3), padding='same', kernel_regularizer=reg)(x)
+        x = layers.Conv2D(filters, (3, 3), padding="same", kernel_regularizer=reg)(x)
         x = layers.BatchNormalization()(x)
-        x = layers.Activation('relu')(x)
-        x = layers.Conv2D(filters, (3, 3), padding='same', kernel_regularizer=reg)(x)
+        x = layers.Activation("relu")(x)
+        x = layers.Conv2D(filters, (3, 3), padding="same", kernel_regularizer=reg)(x)
         x = layers.BatchNormalization()(x)
         x = layers.Add()([x, shortcut])
-        x = layers.Activation('relu')(x)
+        x = layers.Activation("relu")(x)
         return x
-    
+
     def update_target_model(self):
         self.target_model.set_weights(self.model.get_weights())
 
@@ -103,19 +112,17 @@ class MCTSAgent():
                 piece_idx = piece.piece_type - 1  # 0=P, 1=N, ..., 5=K
                 if piece.color == chess.BLACK:
                     piece_idx += 6
-                
+
                 rank = 7 - chess.square_rank(square)
                 file = chess.square_file(square)
                 state[rank, file, piece_idx] = 1.0
 
         return state
-    
 
     def act(self, env):
         best_move, _, _ = self.simulate(env)
         return best_move
 
-    
     def sequential_halving_phase(self, root, candidates, env, budget_per_candidate):
         """
         One phase of Sequential Halving on the current candidate children.
@@ -149,8 +156,6 @@ class MCTSAgent():
 
         return [child for child, _ in sorted_items[:n_keep]]
 
-    
-
     def rollout_from_candidate(self, root, child, env, depth_limit=64):
         """
         One rollout:
@@ -171,16 +176,16 @@ class MCTSAgent():
 
         node = child
         depth = 1
-        
+
         leaf_value = 0.0
 
         # If move caused termination (e.g. mate), reward is from parent's perspective
         # But backup_path expects value from child's perspective, so negate
         if done:
-             leaf_value = -reward  # Negate: reward is from parent, child is opponent
-             backup_path(path, leaf_value)
-             env.go_back(baseline)
-             return
+            leaf_value = -reward  # Negate: reward is from parent, child is opponent
+            backup_path(path, leaf_value)
+            env.go_back(baseline)
+            return
 
         # Expand child once if needed
         if not node.expanded:
@@ -213,7 +218,7 @@ class MCTSAgent():
             _, reward, done = env.step(next_child.move)
             node = next_child
             depth += 1
-            
+
             if done:
                 # reward is from the player who just moved perspective
                 # Need to convert to last node's perspective (negate)
@@ -222,7 +227,7 @@ class MCTSAgent():
 
         # 3) Terminal handling or depth limit
         if not done:
-             # Depth limit hit but game not over: evaluate with value head
+            # Depth limit hit but game not over: evaluate with value head
             leaf_value = node.expand_leaf(env, self.model)
 
         backup_path(path, leaf_value)
@@ -230,12 +235,10 @@ class MCTSAgent():
         # 4) Rewind environment to original root state
         env.go_back(baseline)
 
-
     def compute_policy_improvement(self, root, state):
-
         # Step 1: get raw logits + value head vπ
         policy_probs, v_pi = self.model(state[None], training=False)
-        policy_probs = policy_probs.numpy()[0]     # shape = (4096,)
+        policy_probs = policy_probs.numpy()[0]  # shape = (4096,)
         v_pi = float(v_pi.numpy()[0])
 
         # numerical safety
@@ -244,7 +247,6 @@ class MCTSAgent():
 
         # convert probabilities to log-probabilities (pseudo-logits)
         logits = np.log(policy_probs)
-
 
         move_mapping = self.move_mapping
 
@@ -281,15 +283,13 @@ class MCTSAgent():
 
         improved_logits = improved_logits + legal_mask
 
-
-
         improved_policy = np.exp(improved_logits - np.max(improved_logits))
         improved_policy /= np.sum(improved_policy)
 
         return improved_policy, v_pi
 
     def simulate(self, env, k_root=8):
-        """"
+        """ "
         Run Gumbel-style root search and return:
         - best_move: chess.Move
         - improved_policy: np.array shape (4096,) over global action space
@@ -316,10 +316,7 @@ class MCTSAgent():
                 break
 
             # Simple budget allocation: spread n_simulations across phases & candidates
-            budget_per_candidate = max(
-                1,
-                self.n_simulations // (P * n_cand)
-            )
+            budget_per_candidate = max(1, self.n_simulations // (P * n_cand))
 
             current_candidates = self.sequential_halving_phase(
                 root,
@@ -328,14 +325,13 @@ class MCTSAgent():
                 budget_per_candidate,
             )
 
-       
         best_child = current_candidates[0]
 
         # --- POLICY IMPROVEMENT AT ROOT ---------------------------------
         state = env.get_state()
         improved_policy, v_pi = self.compute_policy_improvement(root, state)
 
-                # Mask illegal moves BEFORE selecting the final move
+        # Mask illegal moves BEFORE selecting the final move
         legal_mask = np.zeros_like(improved_policy)
         for move in root.children.keys():
             idx = self.move_mapping.get_index(move.uci())
@@ -352,30 +348,27 @@ class MCTSAgent():
                 improved_policy[idx] = 1.0
         improved_policy /= improved_policy.sum()
 
-
         return best_child.move, improved_policy, v_pi
 
-
-    def replay(self, batch_size, epochs=1):
+    def replay(self, batch_size, epochs=2):
         min_memory = 1000
         if len(self.memory) < min_memory:
             return
 
         # 1. Sample a larger pool of data (e.g., 2048 or 4096 samples)
         # This reduces the correlation between consecutive updates
-        sample_size = min(len(self.memory), 4096) 
+        sample_size = min(len(self.memory), 4096)
         minibatch = random.sample(self.memory, sample_size)
 
         # 2. Vectorized Unpacking (Much faster than list comps in a loop)
         # We transpose the list of tuples: [(s,p,v), (s,p,v)] -> [s,s], [p,p], [v,v]
         states, policies, values = map(np.array, zip(*minibatch))
 
-
         # 3. Fit in one go
         # shuffle=True ensures the batches are randomized internally
         self.model.fit(
             states,
-            {'policy': policies, 'value': values},
+            {"policy": policies, "value": values},
             batch_size=batch_size,
             epochs=epochs,
             shuffle=True,
@@ -386,5 +379,3 @@ class MCTSAgent():
 
     def save(self, name):
         self.model.save_weights(name)
-
-
