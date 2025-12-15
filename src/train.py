@@ -1,14 +1,13 @@
-import random
-from collections import deque
+import argparse
 import os
-import chess
-import numpy as np
+from collections import deque
 
-from src.mcts_agent import MCTSAgent
+import chess
+
 from src.environment import ChessEnv
+from src.mcts_agent import MCTSAgent
 from src.utils.symmetries import augment_sample
 
-import argparse
 
 def train_agent(start_fen=None):
     # Training parameters
@@ -18,16 +17,17 @@ def train_agent(start_fen=None):
 
     # Initialize environment and agent
     env = ChessEnv(demo_mode=False)
-    state_size = (8 , 8 , 12)  # 8x8 board with 12 channels
+    state_size = (8, 8, 12)  # 8x8 board with 12 channels
     mates = 0
     agent = MCTSAgent(state_size=state_size, n_simulations=n_simulations)
-    
+
     episodes = n_episodes
     checkpoint_frequency = 3
-    target_update_frequency = 10 
+    target_update_frequency = 10
 
     import tensorflow as tf
-    print("Num GPUs Available: ", len(tf.config.list_physical_devices('GPU')))
+
+    print("Num GPUs Available: ", len(tf.config.list_physical_devices("GPU")))
 
     model_file = "model_checkpoint.weights.h5"
 
@@ -41,7 +41,6 @@ def train_agent(start_fen=None):
     else:
         print("No model found, training a new one.")
 
-
     # Pure self-play (AlphaZero style) - no curriculum
     # Agent learns from random positions, exploring diverse scenarios
     recent_results = deque(maxlen=100)  # Track last 100 games for monitoring
@@ -49,13 +48,13 @@ def train_agent(start_fen=None):
     for e in range(episodes):
         # Always use random positions (difficulty=2) unless FEN is provided
         env.reset(fen=start_fen, difficulty=2 if not start_fen else None)
-        
+
         moves_made = 0
         game_samples = []  # list of (state, improved_policy, player_color)
 
         print(f"episode {e}")
 
-        max_moves = 200  
+        max_moves = 200
 
         while not env.done and moves_made < max_moves:
             state = env.get_state()
@@ -82,17 +81,17 @@ def train_agent(start_fen=None):
         # ----- game finished or max_moves reached -----
         # Use final game result as value target z
         result = env.board.result(claim_draw=True)  # "1-0","0-1","1/2-1/2","*"
-        
+
         z_white = 0.0
         if result == "1-0":
             z_white = 1.0
-            recent_results.append(1) # Win for White
+            recent_results.append(1)  # Win for White
         elif result == "0-1":
             z_white = -1.0
-            recent_results.append(0) # Loss for White (shouldn't happen in QK vs K)
+            recent_results.append(0)  # Loss for White (shouldn't happen in QK vs K)
         elif result == "1/2-1/2":
             z_white = 0.0
-            recent_results.append(0) # Draw
+            recent_results.append(0)  # Draw
         else:
             # game truncated or unknown
             z_white = 0.0
@@ -106,23 +105,21 @@ def train_agent(start_fen=None):
                 z = z_white
             else:
                 z = -z_white
-            
+
             # Generate augmented samples (8 symmetries)
-            augmented = augment_sample(s, pi, agent.move_mapping, num_augmentations=8)
+            augmented = augment_sample(s, pi, agent.move_mapping, num_augmentations=2)
             for aug_state, aug_policy in augmented:
                 agent.memory.append((aug_state, aug_policy, z))
-
 
         # Monitor win rate (for tracking progress, not for curriculum)
         if len(recent_results) >= 50:
             win_rate = sum(recent_results) / len(recent_results)
             print(f"Recent Win Rate: {win_rate:.2f}")
 
-
         print(
             f"Episode: {e}/{episodes}, "
             f"moves: {moves_made}, "
-            f"mates: {mates}/{e+1}, "
+            f"mates: {mates}/{e + 1}, "
             f"final result: {result}"
         )
 
@@ -137,15 +134,18 @@ def train_agent(start_fen=None):
 
     return agent
 
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description='Train Chess MCTS Agent')
-    parser.add_argument('--fen', type=str, help='Starting FEN string')
-    parser.add_argument('--pgn', type=str, help='Path to PGN file to load starting position from')
-    
+    parser = argparse.ArgumentParser(description="Train Chess MCTS Agent")
+    parser.add_argument("--fen", type=str, help="Starting FEN string")
+    parser.add_argument(
+        "--pgn", type=str, help="Path to PGN file to load starting position from"
+    )
+
     args = parser.parse_args()
-    
+
     start_fen = args.fen
-    
+
     if args.pgn:
         with open(args.pgn) as f:
             game = chess.pgn.read_game(f)
