@@ -8,10 +8,9 @@ A sophisticated **Gumbel AlphaZero (GAZ)** agent designed to master **Chess**. T
 
 While the default training loop focuses on the **King and Queen vs. King (KQK)** endgame for rapid demonstration, the agent and architecture are fully capable of training on **any chess position** or full games.
 
-![Agent in Action](images/mate.png)
-*Figure 1: The agent (White) delivering a checkmate against the Stockfish engine.*
+*The Gumbel AlphaZero agent playing against itself.*
 
----
+<img src="images/demo.GIF" width="500" title="Gumbel AlphaZero Self-play">
 
 ## 🌟 Key Features
 
