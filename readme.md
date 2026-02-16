@@ -97,7 +97,7 @@ docker-compose up --build
 Clone the repository and install the required packages via the Python package manager.
 
 ```bash
-git clone [https://github.com/JamalEddineEb/gumbel-alpha-zero-for-chess](https://github.com/JamalEddineEb/gumbel-alpha-zero-for-chess)
+git clone https://github.com/JamalEddineEb/gumbel-alpha-zero-for-chess
 cd chess-endgame-mcts
 pip install -r requirements.txt
 
