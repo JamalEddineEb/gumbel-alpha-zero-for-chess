@@ -17,7 +17,7 @@ While the default training loop focuses on the **King and Queen vs. King (KQK)**
 - **🚀 Gumbel-Max Exploration**: Uses Gumbel noise sampling for robust action selection without the need for high simulation counts ($N$).
 - **📉 Sequential Halving**: Implements an efficient search budget allocation strategy, progressively pruning low-value branches.
 - **🧠 Two-Headed Architecture**: Features a modern CNN with separate heads for **Policy** (move probabilities) and **Value** (win/loss estimation).
-- **🤖 Stockfish Baseline**: Trains against the world-class **Stockfish** engine to ensure high-quality self-play data and rigorous evaluation.
+- **🤖 Self-play**: Trains against itself to ensure high-quality self-play data and rigorous evaluation.
 - **🌐 General Purpose**: Supports loading any board state via FEN or PGN for training and inference.
 - **🐳 Docker Support**: Fully containerized environment for easy reproducibility.
 
