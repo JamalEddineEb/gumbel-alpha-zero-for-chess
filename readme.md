@@ -1,131 +1,148 @@
-# ♟️ Gumbel AlphaZero for Chess
+# Gumbel AlphaZero for Chess
 
 ![Python](https://img.shields.io/badge/Python-3.8%2B-blue)
 ![TensorFlow](https://img.shields.io/badge/TensorFlow-2.x-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
 
-A sophisticated **Gumbel AlphaZero (GAZ)** agent designed to master **Chess**. This project demonstrates the power of combining deep convolutional neural networks with **Sequential Halving MCTS** and **Gumbel noise exploration**, achieving superior sample efficiency compared to traditional AlphaZero methods.
+## Abstract
 
-While the default training loop focuses on the **King and Queen vs. King (KQK)** endgame for rapid demonstration, the agent and architecture are fully capable of training on **any chess position** or full games.
+This repository provides a comprehensive implementation of a Gumbel AlphaZero (GAZ) agent applied specifically to the domain of chess. The project investigates the synthesis of deep convolutional neural networks with Sequential Halving Monte Carlo Tree Search (MCTS) and Gumbel noise exploration. This methodology aims to achieve superior sample efficiency and more robust policy improvement targets compared to standard AlphaZero implementations.
 
-*The Gumbel AlphaZero agent playing against itself.*
+The baseline training loop evaluates the King and Queen versus King (KQK) endgame to facilitate rapid empirical demonstration of convergence. However, the underlying architecture and environment wrappers are fully generalized to support training and inference on arbitrary chess positions or complete games.
 
-<img src="images/demo.GIF" width="500" title="Gumbel AlphaZero Self-play">
+<p align="center">
+  <img src="images/demo.GIF" width="500" alt="Gumbel AlphaZero Self-training">
+  <br>
+  <em>Figure 1: The Gumbel AlphaZero agent executing self-play.</em>
+</p>
 
-## 🌟 Key Features
+## Methodology
 
-- **🚀 Gumbel-Max Exploration**: Uses Gumbel noise sampling for robust action selection without the need for high simulation counts ($N$).
-- **📉 Sequential Halving**: Implements an efficient search budget allocation strategy, progressively pruning low-value branches.
-- **🧠 Two-Headed Architecture**: Features a modern CNN with separate heads for **Policy** (move probabilities) and **Value** (win/loss estimation).
-- **🤖 Self-play**: Trains against itself to ensure high-quality self-play data and rigorous evaluation.
-- **🌐 General Purpose**: Supports loading any board state via FEN or PGN for training and inference.
-- **🐳 Docker Support**: Fully containerized environment for easy reproducibility.
+The architecture relies on several advanced modifications to the traditional reinforcement learning paradigms used in deterministic perfect-information games:
 
----
+* **Gumbel-Max Exploration**: Replaces standard Dirichlet noise with Gumbel noise sampling. By applying the Gumbel-Max trick at the root node of the search tree, the agent achieves robust action selection and continuous exploration without requiring a prohibitively high number of search simulations ($N$).
+* **Sequential Halving**: Utilizes a dynamic search budget allocation strategy. The algorithm evaluates candidate actions and progressively prunes low-value branches. This maximizes search depth for promising trajectories within strictly constrained computational limits.
+* **Dual-Headed Convolutional Architecture**: Implements a deep Convolutional Neural Network (CNN) featuring bifurcated outputs. The policy head approximates the optimal move probabilities, while the value head approximates the expected game outcome (win, draw, or loss).
+* **Self-Play Reinforcement Learning**: The agent functions autonomously, generating its own training data through iterative self-play. This ensures rigorous policy evaluation and continuous, monotonic improvement over successive training epochs.
+* **Generalized State Representation**: Supports state initialization and serialization via standard Forsyth-Edwards Notation (FEN) or Portable Game Notation (PGN), ensuring interoperability with existing chess engines and databases.
 
-## 📂 Project Structure
+## Empirical Results
 
-```
+The agent demonstrates steady convergence during the self-play training phase. The log below captures a specific training epoch, highlighting the reduction in policy and value loss alongside increasing predictive accuracy and a stabilizing win rate.
+
+<p align="center">
+  <img src="images/training.png" alt="Training Metrics">
+  <br>
+  <em>Figure 2: Console output demonstrating training progression, win rate tracking, and loss metrics over 7903 episodes.</em>
+</p>
+
+## Theoretical Framework
+
+### Simulation Budget Allocation
+
+Traditional AlphaZero relies on the PUCT (Predictor + Upper Confidence Bound applied to Trees) algorithm, which necessitates an extensive number of node visitations to form a reliable policy target. Gumbel AlphaZero optimizes this limitation through Sequential Halving. 
+
+
+
+Given a fixed budget of $N$ simulations, the algorithm evaluates an initial set of $K$ candidate actions. It retains the top $K/2$ candidates based on their estimated action values, then the top $K/4$, continuously doubling the visit counts for the surviving actions at each subsequent stage until a single optimal action remains.
+
+### Policy Improvement Target
+
+Unlike standard AlphaZero which trains the neural network to match the raw distribution of visit counts, Gumbel AlphaZero optimizes the network policy to minimize the Kullback-Leibler divergence from a search-improved policy, denoted as $\pi'$. The improved target policy is mathematically formulated as:
+
+$$\pi' \propto \text{softmax}(\text{logits} + \sigma(Q_{\text{completed}}))$$
+
+This formulation ensures the network internalizes the empirical value distributions discovered during the tree search rather than exclusively fitting to raw visitation frequencies, significantly accelerating the learning process.
+
+## Repository Structure
+
+```text
 chess-endgame-mcts/
-├── docker-compose.yml      # Docker services configuration
-├── dockerfile              # Docker image definition
-├── images/                 # Project assets
+├── docker-compose.yml           # Docker services configuration
+├── dockerfile                   # Docker image definition
+├── images/                      # Project assets
 │   └── mate.png
-├── model_checkpoint.weights.h5  # Trained model weights
-├── readme.md               # Project documentation
-├── requirements.txt        # Python dependencies
-└── src/                    # Source code
-    ├── chess_renderer.py   # PyQt5 GUI for visualization
-    ├── environment.py      # Chess environment & Stockfish wrapper
-    ├── mcts_agent.py       # MCTS algorithm & Neural Network
-    ├── mcts_node.py        # Tree search node definition
-    ├── play.py             # Inference script (GUI/Headless)
-    ├── train.py            # Training loop (Self-play)
-    └── utils/              # Helper utilities
+├── model_checkpoint.weights.h5  # Serialized model weights
+├── readme.md                    # Project documentation
+├── requirements.txt             # Python dependency specifications
+└── src/                         # Source code directory
+    ├── chess_renderer.py        # PyQt5 GUI for state visualization
+    ├── environment.py           # Chess environment and Stockfish interface
+    ├── mcts_agent.py            # MCTS algorithm and Neural Network definitions
+    ├── mcts_node.py             # Tree search node data structure
+    ├── play.py                  # Inference and evaluation script
+    ├── train.py                 # Self-play training loop
+    └── utils/                   # Helper functions and utilities
+
 ```
 
----
-
-## 🚀 Getting Started
+## Environment Setup
 
 ### Prerequisites
 
-- **Python 3.8+**
-- **Stockfish**: Must be installed and accessible in your system path (or configured in `src/environment.py`).
+* Python 3.8 or higher.
+* Stockfish binary installed and accessible in the system path (or explicitly configured within `src/environment.py`).
 
-### 📦 Installation
+### Installation via Docker (Recommended)
 
-#### Option A: Local Setup
+Containerization ensures environment consistency, resolving any potential cross-platform dependency conflicts.
 
-1.  Clone the repository:
-    ```bash
-    git clone https://github.com/yourusername/chess-endgame-mcts.git
-    cd chess-endgame-mcts
-    ```
+```bash
+docker-compose up --build
 
-2.  Install dependencies:
-    ```bash
-    pip install -r requirements.txt
-    ```
+```
 
-#### Option B: Docker (Recommended)
+### Local Installation
 
-1.  Build and run the container:
-    ```bash
-    docker-compose up --build
-    ```
+Clone the repository and install the required packages via the Python package manager.
 
----
+```bash
+git clone [https://github.com/JamalEddineEb/gumbel-alpha-zero-for-chess](https://github.com/JamalEddineEb/gumbel-alpha-zero-for-chess)
+cd chess-endgame-mcts
+pip install -r requirements.txt
 
-## 💻 Usage
+```
 
-### 1. Training the Agent
+## Experimental Reproduction
 
-Start the self-play training loop. By default, it generates random **KQK** positions.
+### Training Phase
+
+Execute the self-play training loop. By default, the environment initializes randomized KQK endgame positions to test the agent's ability to force checkmate.
 
 ```bash
 python -m src.train
+
 ```
 
-**Arguments:**
-- `--fen <string>`: Start training from a specific FEN position (e.g., full starting position).
-- `--pgn <path>`: Load a starting position from a PGN file.
+**Configurable Arguments:**
 
-**Example (Full Game Training):**
+* `--fen <string>`: Initialize training from a specific FEN state.
+* `--pgn <path>`: Initialize training from a PGN file.
+
+**Example (Standard Opening Formulation):**
+
 ```bash
 python -m src.train --fen "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
 ```
 
-### 2. Playing / Demo
+### Evaluation Phase
 
-Watch the trained agent play in real-time.
+Deploy the trained agent for real-time inference and evaluation against a human operator or another engine.
 
 ```bash
 python -m src.play
+
 ```
 
-**Arguments:**
-- `--fen <string>`: Set the starting board position.
-- `--headless`: Run without the GUI (terminal output only).
+**Configurable Arguments:**
 
-**Example (Custom Endgame):**
+* `--fen <string>`: Specify the initial board state.
+* `--headless`: Execute inference without graphical rendering (standard output only).
+
+**Example (Custom State Evaluation):**
+
 ```bash
 python -m src.play --fen "8/8/3k4/8/8/3K1Q2/8/8 w - - 0 1"
+
 ```
-
----
-
-## 🧠 Algorithmic Details
-
-### The Gumbel Advantage
-Traditional AlphaZero relies on PUCT (Predictor + Upper Confidence Bound applied to Trees) which requires many simulations to visit nodes. **Gumbel AlphaZero** improves this by:
-
-1.  **Sampling**: Using Gumbel noise to select a set of candidate actions at the root.
-2.  **Sequential Halving**: Allocating the simulation budget dynamically. If we have $N$ simulations, we evaluate $K$ candidates, then keep the top $K/2$, then $K/4$, and so on, doubling the visits for the survivors at each stage.
-
-### Policy Improvement Target
-The network is trained to match an improved policy $\pi'$:
-
-$$ \pi' \propto \text{softmax}(\text{logits} + \sigma(Q_{completed})) $$
-
-This ensures the network learns from the *search-improved* values rather than just raw visit counts.
